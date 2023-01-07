@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:full_time_force_test/src/Utils/Colors.dart';
 import 'package:full_time_force_test/src/models/PokemonModel.dart';
 import 'package:http/http.dart' as http;
+import 'package:percent_indicator/linear_percent_indicator.dart';
 
 import '../models/PokemonApiResponse.dart';
 // ignore: unused_import
@@ -16,44 +18,144 @@ class DetailScreen extends StatelessWidget {
       slivers: [
         _SliverAppbar(args: args),
         SliverList(
-            delegate: SliverChildListDelegate(
-                [const Flexible(child: _DetailsPokemon())]))
+            delegate: SliverChildListDelegate([_DetailsPokemon(args: args)]))
       ],
     ));
   }
 }
 
 class _DetailsPokemon extends StatelessWidget {
-  const _DetailsPokemon({
-    Key? key,
-  }) : super(key: key);
+  final List<dynamic> args;
+
+  const _DetailsPokemon({required this.args});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-        future: getPokemonsDetails('blastoise'),
+    return FutureBuilder<PokemonModel>(
+        future: getPokemonsDetails(args[0].name.toString().capitalize()),
         builder: (context, snapshot) {
           if (snapshot.hasData == true) {
-            return const _ContentDetails();
+            return _ContentDetails(pokemon: snapshot.data!);
           } else {
-            return const CircularProgressIndicator();
+            return const Center(child: CircularProgressIndicator());
           }
         });
   }
 }
 
 class _ContentDetails extends StatelessWidget {
-  const _ContentDetails({
-    Key? key,
-  }) : super(key: key);
+  PokemonModel pokemon;
+  _ContentDetails({required this.pokemon});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: const [
-        Text('data'),
-      ],
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          _TypesPokemon(pokemon: pokemon),
+          _StatsPokemon(pokemon: pokemon),
+        ],
+      ),
     );
+  }
+}
+
+class _TypesPokemon extends StatelessWidget {
+  const _TypesPokemon({
+    Key? key,
+    required this.pokemon,
+  }) : super(key: key);
+  final PokemonModel pokemon;
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 50,
+      child: GridView.count(
+        shrinkWrap: true,
+        crossAxisCount: 2,
+        padding: const EdgeInsets.all(0),
+        physics: const NeverScrollableScrollPhysics(),
+        children: List.generate(pokemon.types.length, (index) {
+          return Column(
+            children: [
+              Chip(
+                  backgroundColor: pokemon.types[index].type.name == 'grass'
+                      ? CustomColors.green
+                      : pokemon.types[index].type.name == 'fire'
+                          ? CustomColors.red
+                          : CustomColors.blue,
+                  label: Text(
+                    pokemon.types[index].type.name.capitalize(),
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
+                  )),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _StatsPokemon extends StatelessWidget {
+  const _StatsPokemon({
+    Key? key,
+    required this.pokemon,
+  }) : super(key: key);
+
+  final PokemonModel pokemon;
+
+  @override
+  Widget build(BuildContext context) {
+    Color green = const Color.fromRGBO(60, 208, 128, 1);
+    Color blue = const Color.fromRGBO(112, 152, 200, 1);
+    Color red = const Color.fromRGBO(208, 80, 48, 1);
+    return ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        shrinkWrap: true,
+        itemCount: pokemon.stats.length,
+        physics: const NeverScrollableScrollPhysics(),
+        itemBuilder: (BuildContext context, int index) {
+          return Column(
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: 80,
+                    child: Text(
+                      pokemon.stats[index].stat.name.capitalize(),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  ),
+                  LinearPercentIndicator(
+                    barRadius: const Radius.circular(20),
+                    width: MediaQuery.of(context).size.width - 100,
+                    animation: true,
+                    lineHeight: 20.0,
+                    animationDuration: 2000,
+                    percent: pokemon.stats[index].baseStat < 100
+                        ? pokemon.stats[index].baseStat / 100
+                        : pokemon.stats[index].baseStat / 200,
+                    center: Text(
+                      pokemon.stats[index].baseStat.toString(),
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    progressColor: index < 2
+                        ? green
+                        : index > 3
+                            ? blue
+                            : red,
+                  ),
+                ],
+              ),
+              const SizedBox(
+                height: 15,
+              ),
+            ],
+          );
+        });
   }
 }
 
@@ -124,8 +226,9 @@ class _SliverAppbar extends StatelessWidget {
 }
 
 Future<PokemonModel> getPokemonsDetails(String pokemon) async {
+  var parseName = pokemon.toLowerCase();
   const String baseUrl = 'https://pokeapi.co/api/v2';
-  final response = await http.get(Uri.parse('$baseUrl/pokemon/$pokemon'));
+  final response = await http.get(Uri.parse('$baseUrl/pokemon/$parseName'));
   if (response.statusCode == 200) {
     final data = response.body;
     return PokemonModel.fromJson(data);
